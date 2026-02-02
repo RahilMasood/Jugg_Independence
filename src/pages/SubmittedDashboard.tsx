@@ -67,7 +67,7 @@ export default function SubmittedDashboard() {
 
   return (
     <MainLayout>
-      <div className="max-w-4xl mx-auto">
+      <div>
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <CheckCircle2 className="h-6 w-6 text-success" />

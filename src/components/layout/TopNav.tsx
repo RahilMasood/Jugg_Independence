@@ -43,35 +43,6 @@ export function TopNav() {
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <nav className="flex items-center">
-          <div className="flex items-center rounded-lg bg-muted p-1">
-            {filteredNavItems.map((item) => {
-              const isActive = location.pathname === item.href || 
-                (item.href !== "/" && location.pathname.startsWith(item.href));
-              
-              return (
-                <Link
-                  key={item.href}
-                  to={item.href}
-                  className={cn(
-                    "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all duration-200",
-                    isActive
-                      ? "bg-card text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <item.icon className={cn(
-                    "h-4 w-4",
-                    isActive ? "text-accent" : "text-muted-foreground"
-                  )} />
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-          </div>
-        </nav>
-
         {/* User Profile */}
         <div className="flex items-center gap-3">
           <div className="text-right">
@@ -91,5 +62,44 @@ export function TopNav() {
         </div>
       </div>
     </header>
+  );
+}
+
+export function SectionNav() {
+  const location = useLocation();
+  const userRole = currentUser.role;
+
+  const filteredNavItems = navItems.filter(
+    item => !item.roles || (item.roles as readonly string[]).includes(userRole)
+  );
+
+  return (
+    <nav className="mb-6">
+      <div className="inline-flex items-center rounded-lg bg-muted p-1">
+        {filteredNavItems.map((item) => {
+          const isActive = location.pathname === item.href || 
+            (item.href !== "/" && location.pathname.startsWith(item.href));
+          
+          return (
+            <Link
+              key={item.href}
+              to={item.href}
+              className={cn(
+                "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all duration-200",
+                isActive
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <item.icon className={cn(
+                "h-4 w-4",
+                isActive ? "text-accent" : "text-muted-foreground"
+              )} />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
