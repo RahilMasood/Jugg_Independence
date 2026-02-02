@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Sidebar } from "./Sidebar";
+import { TopNav } from "./TopNav";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -8,11 +8,9 @@ interface MainLayoutProps {
 export function MainLayout({ children }: MainLayoutProps) {
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar />
-      <main className="pl-64">
-        <div className="min-h-screen p-8">
-          {children}
-        </div>
+      <TopNav />
+      <main className="p-8">
+        {children}
       </main>
     </div>
   );
