@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { TopNav } from "./TopNav";
+import { TopNav, SectionNav } from "./TopNav";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -10,7 +10,10 @@ export function MainLayout({ children }: MainLayoutProps) {
     <div className="min-h-screen bg-background">
       <TopNav />
       <main className="p-8">
-        {children}
+        <div className="max-w-4xl mx-auto">
+          <SectionNav />
+          {children}
+        </div>
       </main>
     </div>
   );
