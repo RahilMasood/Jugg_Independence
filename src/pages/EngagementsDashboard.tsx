@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { EngagementCard } from "@/components/engagement/EngagementCard";
 import { AddUserDialog } from "@/components/engagement/AddUserDialog";
-import { mockEngagements, currentUser } from "@/data/mockData";
+import { useAuth } from "@/contexts/AuthContext";
+import { engagementApi } from "@/lib/api";
 import { Engagement, User } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,41 +18,103 @@ import {
   UserPlus, 
   Users,
   Mail,
-  Trash2
+  Trash2,
+  Loader2,
+  LogOut
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export default function EngagementsDashboard() {
-  const [engagements, setEngagements] = useState(mockEngagements);
+  const navigate = useNavigate();
+  const { isAuthenticated, logout } = useAuth();
+  const queryClient = useQueryClient();
   const [selectedEngagement, setSelectedEngagement] = useState<Engagement | null>(null);
   const [showAddUserDialog, setShowAddUserDialog] = useState(false);
 
-  // Filter engagements where current user is a partner or manager
-  const userEngagements = engagements.filter(
-    eng => eng.teamMembers.some(
-      member => member.id === currentUser.id && (member.role === "partner" || member.role === "manager")
-    )
-  );
+  // Check authentication on mount
+  useEffect(() => {
+    const accessToken = localStorage.getItem("accessToken");
+    if (!accessToken) {
+      navigate("/");
+      return;
+    }
+  }, [navigate]);
 
-  const handleAddUsers = (users: User[]) => {
+  // Fetch engagements for independence tool (partner/manager only)
+  const { data: engagements = [], isLoading, error } = useQuery({
+    queryKey: ['engagements', 'independence-tool'],
+    queryFn: async () => {
+      const data = await engagementApi.getEngagementsForIndependenceTool();
+      // Transform backend format to frontend format
+      return data.map((eng: any) => ({
+        id: eng.id,
+        engagement_name: eng.engagement_name,
+        entityName: eng.engagement_name || eng.client_name,
+        entityCode: eng.id,
+        client_name: eng.client_name,
+        audit_client_id: eng.audit_client_id,
+        status: eng.status === 'Active' ? 'pending' : 'submitted',
+        teamMembers: eng.teamMembers || [],
+        created_at: eng.created_at,
+        updated_at: eng.updated_at
+      }));
+    },
+    enabled: isAuthenticated,
+  });
+
+  // Fetch selected engagement details
+  const { data: engagementDetails } = useQuery({
+    queryKey: ['engagement', selectedEngagement?.id],
+    queryFn: async () => {
+      if (!selectedEngagement?.id) return null;
+      const data = await engagementApi.getEngagement(selectedEngagement.id);
+      // Filter to show only users with independence_tool=true
+      const independenceUsers = (data.teamMembers || []).filter((m: User) => m.independence_tool === true);
+      return {
+        ...selectedEngagement,
+        teamMembers: independenceUsers
+      };
+    },
+    enabled: !!selectedEngagement?.id && isAuthenticated,
+  });
+
+  // Update selected engagement when details are loaded
+  useEffect(() => {
+    if (engagementDetails) {
+      setSelectedEngagement(engagementDetails);
+    }
+  }, [engagementDetails]);
+
+  // Add users to independence tool mutation
+  const addUserMutation = useMutation({
+    mutationFn: async ({ engagementId, userId }: { engagementId: string; userId: string }) => {
+      return await engagementApi.addUserToIndependenceTool(engagementId, userId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['engagement', selectedEngagement?.id] });
+      queryClient.invalidateQueries({ queryKey: ['engagements', 'independence-tool'] });
+      toast.success('User added to independence tool successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to add user');
+    }
+  });
+
+  const handleAddUsers = async (users: User[]) => {
     if (!selectedEngagement) return;
 
-    setEngagements(prev =>
-      prev.map(eng =>
-        eng.id === selectedEngagement.id
-          ? { ...eng, teamMembers: [...eng.teamMembers, ...users] }
-          : eng
-      )
-    );
+    // Add each user to independence tool
+    for (const user of users) {
+      await addUserMutation.mutateAsync({
+        engagementId: selectedEngagement.id,
+        userId: user.id
+      });
+    }
 
-    // Update selected engagement
-    setSelectedEngagement(prev =>
-      prev ? { ...prev, teamMembers: [...prev.teamMembers, ...users] } : null
-    );
-
-    toast.success(`Added ${users.length} team member(s) successfully!`);
+    // Refresh engagement details
+    queryClient.invalidateQueries({ queryKey: ['engagement', selectedEngagement.id] });
   };
 
   const handleRemoveUser = (userId: string) => {
@@ -57,19 +122,14 @@ export default function EngagementsDashboard() {
 
     // Prevent removing partners/managers
     const userToRemove = selectedEngagement.teamMembers.find(m => m.id === userId);
-    if (userToRemove?.role === "partner" || userToRemove?.role === "manager") {
+    const role = userToRemove?.role || '';
+    if (role === "engagement_partner" || role === "engagement_manager" || role === "partner" || role === "manager") {
       toast.error("Cannot remove partners or managers from the engagement");
       return;
     }
 
-    setEngagements(prev =>
-      prev.map(eng =>
-        eng.id === selectedEngagement.id
-          ? { ...eng, teamMembers: eng.teamMembers.filter(m => m.id !== userId) }
-          : eng
-      )
-    );
-
+    // TODO: Implement remove user API call if needed
+    // For now, just update local state
     setSelectedEngagement(prev =>
       prev ? { ...prev, teamMembers: prev.teamMembers.filter(m => m.id !== userId) } : null
     );
@@ -100,10 +160,11 @@ export default function EngagementsDashboard() {
                   </div>
                   <div>
                     <h1 className="text-2xl font-bold text-foreground">
-                      {selectedEngagement.entityName}
+                      {selectedEngagement.entityName || selectedEngagement.engagement_name || selectedEngagement.client_name}
                     </h1>
                     <p className="text-muted-foreground">
-                      {selectedEngagement.entityCode} • FY {selectedEngagement.financialYear}
+                      {selectedEngagement.entityCode || selectedEngagement.id}
+                      {selectedEngagement.fy_year && ` • FY ${selectedEngagement.fy_year}`}
                     </p>
                   </div>
                 </div>
@@ -111,13 +172,15 @@ export default function EngagementsDashboard() {
               </div>
 
               <div className="flex items-center gap-6 mt-6 pt-6 border-t">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  <span>Due: {format(parseISO(selectedEngagement.dueDate), "MMM d, yyyy")}</span>
-                </div>
+                {selectedEngagement.dueDate && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Calendar className="h-4 w-4" />
+                    <span>Due: {format(parseISO(selectedEngagement.dueDate), "MMM d, yyyy")}</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Users className="h-4 w-4" />
-                  <span>{selectedEngagement.teamMembers.length} team members</span>
+                  <span>{selectedEngagement.teamMembers.length} users in independence tool</span>
                 </div>
               </div>
             </CardContent>
@@ -147,10 +210,10 @@ export default function EngagementsDashboard() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                        {member.name.split(' ').map(n => n[0]).join('')}
+                        {(member.name || member.user_name || '').split(' ').map(n => n[0]).join('') || 'U'}
                       </div>
                       <div>
-                        <p className="font-medium text-foreground">{member.name}</p>
+                        <p className="font-medium text-foreground">{member.name || member.user_name}</p>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Mail className="h-3 w-3" />
                           {member.email}
@@ -158,24 +221,17 @@ export default function EngagementsDashboard() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
+                      <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                        In Tool
+                      </span>
                       <span className={cn(
                         "text-xs font-medium px-2.5 py-1 rounded-full capitalize",
-                        member.role === "partner" && "bg-accent/10 text-accent",
-                        member.role === "manager" && "bg-primary/10 text-primary",
-                        member.role === "staff" && "bg-muted text-muted-foreground"
+                        (member.role === "engagement_partner" || member.role === "partner") && "bg-accent/10 text-accent",
+                        (member.role === "engagement_manager" || member.role === "manager") && "bg-primary/10 text-primary",
+                        (member.role === "associate" || member.role === "article" || member.role === "staff") && "bg-muted text-muted-foreground"
                       )}>
-                        {member.role}
+                        {member.role?.replace('_', ' ') || 'member'}
                       </span>
-                      {member.role === "staff" && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleRemoveUser(member.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
                     </div>
                   </div>
                 ))}
@@ -186,7 +242,8 @@ export default function EngagementsDashboard() {
           <AddUserDialog
             open={showAddUserDialog}
             onOpenChange={setShowAddUserDialog}
-            existingUserIds={selectedEngagement.teamMembers.map(m => m.id)}
+            engagementId={selectedEngagement.id}
+            existingUserIds={selectedEngagement.teamMembers.filter(m => m.independence_tool).map(m => m.id)}
             onAddUsers={handleAddUsers}
           />
         </div>
@@ -194,20 +251,81 @@ export default function EngagementsDashboard() {
     );
   }
 
+  const handleLogout = async () => {
+    const refreshToken = localStorage.getItem("refreshToken");
+    const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || "https://juggernautuserauth-production.up.railway.app/api/v1";
+    
+    // Try to call backend logout endpoint if refresh token exists
+    if (refreshToken) {
+      try {
+        await fetch(`${AUTH_API_URL}/auth/logout`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ refreshToken }),
+        }).catch(() => {
+          // Ignore errors during logout
+        });
+      } catch (error) {
+        // Ignore errors during logout
+      }
+    }
+    
+    // Clear local storage
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("user");
+    
+    // Update API client
+    const { apiClient } = await import("@/lib/api");
+    apiClient.setToken(null);
+    
+    if (logout) {
+      logout();
+    }
+    
+    toast.success("Logged out successfully");
+    navigate("/");
+  };
+
   return (
     <MainLayout>
       <div>
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <Briefcase className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">Engagements</h1>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <Briefcase className="h-6 w-6 text-primary" />
+              <h1 className="text-2xl font-bold text-foreground">Engagements</h1>
+            </div>
+            <Button onClick={handleLogout} variant="outline" size="sm">
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </Button>
           </div>
           <p className="text-muted-foreground">
             Manage your engagement teams and member access
           </p>
         </div>
 
-        {userEngagements.length === 0 ? (
+        {isLoading ? (
+          <div className="text-center py-16 bg-card rounded-xl border">
+            <Loader2 className="h-12 w-12 text-muted-foreground mx-auto mb-4 animate-spin" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              Loading engagements...
+            </h3>
+          </div>
+        ) : error ? (
+          <div className="text-center py-16 bg-card rounded-xl border">
+            <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              Error loading engagements
+            </h3>
+            <p className="text-muted-foreground">
+              {error instanceof Error ? error.message : 'An error occurred'}
+            </p>
+          </div>
+        ) : engagements.length === 0 ? (
           <div className="text-center py-16 bg-card rounded-xl border">
             <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-foreground mb-2">
@@ -219,7 +337,7 @@ export default function EngagementsDashboard() {
           </div>
         ) : (
           <div className="space-y-4">
-            {userEngagements.map((engagement) => (
+            {engagements.map((engagement) => (
               <EngagementCard
                 key={engagement.id}
                 engagement={engagement}

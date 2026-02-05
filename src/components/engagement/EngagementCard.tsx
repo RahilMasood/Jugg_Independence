@@ -12,8 +12,13 @@ interface EngagementCardProps {
 }
 
 export function EngagementCard({ engagement, onClick, showTeamCount = false }: EngagementCardProps) {
-  const isOverdue = engagement.status === "pending" && isPast(parseISO(engagement.dueDate));
+  const entityName = engagement.entityName || engagement.engagement_name || engagement.client_name || engagement.id;
+  const entityCode = engagement.entityCode || engagement.id;
+  const financialYear = engagement.financialYear || engagement.fy_year || '';
+  const dueDate = engagement.dueDate;
+  const isOverdue = engagement.status === "pending" && dueDate && isPast(parseISO(dueDate));
   const status = isOverdue ? "overdue" : engagement.status;
+  const independenceToolCount = engagement.teamMembers?.filter(m => m.independence_tool).length || 0;
 
   return (
     <Card 
@@ -32,29 +37,31 @@ export function EngagementCard({ engagement, onClick, showTeamCount = false }: E
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="font-semibold text-foreground truncate">
-                  {engagement.entityName}
+                  {entityName}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {engagement.entityCode} • FY {engagement.financialYear}
+                  {entityCode}{financialYear && ` • FY ${financialYear}`}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-4 mt-4">
-              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Calendar className="h-4 w-4" />
-                <span>
-                  {engagement.status === "submitted" && engagement.submittedDate
-                    ? `Submitted ${format(parseISO(engagement.submittedDate), "MMM d, yyyy")}`
-                    : `Due ${format(parseISO(engagement.dueDate), "MMM d, yyyy")}`
-                  }
-                </span>
-              </div>
+              {dueDate && (
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <Calendar className="h-4 w-4" />
+                  <span>
+                    {engagement.status === "submitted" && engagement.submittedDate
+                      ? `Submitted ${format(parseISO(engagement.submittedDate), "MMM d, yyyy")}`
+                      : `Due ${format(parseISO(dueDate), "MMM d, yyyy")}`
+                    }
+                  </span>
+                </div>
+              )}
 
               {showTeamCount && (
                 <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <Users className="h-4 w-4" />
-                  <span>{engagement.teamMembers.length} members</span>
+                  <span>{independenceToolCount} in independence tool</span>
                 </div>
               )}
             </div>

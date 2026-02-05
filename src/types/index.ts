@@ -1,18 +1,30 @@
 export interface User {
   id: string;
-  name: string;
+  name?: string;
+  user_name?: string;
   email: string;
-  role: 'partner' | 'manager' | 'staff';
+  role?: 'partner' | 'manager' | 'staff' | 'engagement_partner' | 'engagement_manager' | 'associate' | 'article';
+  type?: string;
+  main?: boolean;
+  independence_tool?: boolean;
+  confirmation_tool?: boolean;
+  sampling_tool?: boolean;
 }
 
 export interface Engagement {
   id: string;
-  entityName: string;
-  entityCode: string;
-  financialYear: string;
-  status: 'pending' | 'submitted';
-  dueDate: string;
+  entityName?: string;
+  engagement_name?: string;
+  entityCode?: string;
+  audit_client_id?: string;
+  client_name?: string;
+  financialYear?: string;
+  fy_year?: string;
+  status: 'pending' | 'submitted' | 'Active' | 'Archived';
+  dueDate?: string;
   submittedDate?: string;
+  created_at?: string;
+  updated_at?: string;
   teamMembers: User[];
 }
 
