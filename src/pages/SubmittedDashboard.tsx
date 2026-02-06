@@ -79,18 +79,42 @@ export default function SubmittedDashboard() {
       // Each value is an object with user, engagement_id, responses, etc.
       const entries = Object.entries(jsonData || {}) as [string, any][];
       
-      const currentUserId = user?.id ? String(user.id).toLowerCase().trim() : null;
+      // Get user identifiers - check multiple possible field names
+      const currentUserId = user?.id || (user as any)?.user_id || (user as any)?.userId ? String(user.id || (user as any)?.user_id || (user as any)?.userId).toLowerCase().trim() : null;
       const currentEmail = (user?.email || "").toLowerCase().trim();
-      const currentUserName = (user?.user_name || user?.name || "").toLowerCase().trim();
+      const currentUserName = (user?.user_name || user?.name || (user as any)?.userName || "").toLowerCase().trim();
       const currentType = (user as any)?.type || (user as any)?.user_type || null;
 
-      // Try to match by ID first (most reliable)
+      // Debug logging
+      console.log("Matching user to responses:", {
+        currentUser: {
+          id: currentUserId,
+          email: currentEmail,
+          name: currentUserName,
+          type: currentType,
+          fullUser: user,
+          allUserKeys: user ? Object.keys(user) : []
+        },
+        availableEntries: entries.map(([key, e]) => ({
+          key,
+          userId: e?.user?.id,
+          userEmail: e?.user?.email,
+          userName: e?.user?.name,
+          userRole: e?.user?.role,
+          entryUserKeys: e?.user ? Object.keys(e.user) : []
+        }))
+      });
+
+      // Try to match by ID first (most reliable) - check multiple ID field names
       let match: [string, any] | undefined = currentUserId
         ? entries.find(([_, e]) => {
             const entryId = e?.user?.id ? String(e.user.id).toLowerCase().trim() : null;
-            return entryId && entryId === currentUserId;
+            const entryUserId = e?.user?.user_id ? String(e.user.user_id).toLowerCase().trim() : null;
+            return (entryId && entryId === currentUserId) || (entryUserId && entryUserId === currentUserId);
           })
         : undefined;
+
+      console.log("Match by ID:", match ? { key: match[0], userId: match[1]?.user?.id } : "No match");
 
       // If no ID match, try email
       if (!match && currentEmail) {
@@ -98,6 +122,7 @@ export default function SubmittedDashboard() {
           const entryEmail = e?.user?.email ? String(e.user.email).toLowerCase().trim() : "";
           return entryEmail && entryEmail === currentEmail;
         });
+        console.log("Match by email:", match ? { key: match[0], email: match[1]?.user?.email } : "No match");
       }
 
       // If no email match, try matching by JSON key (user name) or user.name in entry
@@ -107,6 +132,7 @@ export default function SubmittedDashboard() {
           const entryName = e?.user?.name ? String(e.user.name).toLowerCase().trim() : "";
           return (keyLower === currentUserName || entryName === currentUserName);
         });
+        console.log("Match by name:", match ? { key: match[0], name: match[1]?.user?.name } : "No match");
       }
 
       // For external users, if there is exactly one entry with role === 'external', prefer that
@@ -115,11 +141,39 @@ export default function SubmittedDashboard() {
         if (externals.length === 1) {
           match = externals[0];
         }
+        console.log("Match by external role:", match ? { key: match[0] } : `No match (found ${externals.length} external entries)`);
+      }
+
+      // Final fallback: Try to match JSON key directly (case-insensitive, trimmed)
+      // This handles cases where the key is the user's name but doesn't match exactly
+      if (!match) {
+        for (const [key, entry] of entries) {
+          const keyLower = key.toLowerCase().trim();
+          // Try matching key against user name variations
+          if (currentUserName && keyLower === currentUserName) {
+            match = [key, entry];
+            console.log("Match by JSON key (exact):", { key, matchedName: currentUserName });
+            break;
+          }
+          // Try partial match (key contains name or name contains key)
+          if (currentUserName && (keyLower.includes(currentUserName) || currentUserName.includes(keyLower))) {
+            match = [key, entry];
+            console.log("Match by JSON key (partial):", { key, matchedName: currentUserName });
+            break;
+          }
+        }
       }
 
       // Extract the entry data if match found
       if (match && Array.isArray(match[1]?.responses)) {
         selectedResponses = match[1].responses as ChecklistResponse[];
+        console.log("Selected responses found:", selectedResponses.length, "responses");
+      } else {
+        console.log("No match found or no responses array in match", {
+          hasMatch: !!match,
+          hasResponses: match ? Array.isArray(match[1]?.responses) : false,
+          matchData: match ? { key: match[0], hasUser: !!match[1]?.user, hasResponses: !!match[1]?.responses } : null
+        });
       }
     }
   }
