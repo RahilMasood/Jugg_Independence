@@ -1,36 +1,47 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { EngagementCard } from "@/components/engagement/EngagementCard";
 import { ChecklistForm } from "@/components/checklist/ChecklistForm";
-import { mockEngagements, currentUser } from "@/data/mockData";
 import { Engagement, ChecklistResponse } from "@/types";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Clock, FileText } from "lucide-react";
+import { ArrowLeft, Clock, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { independenceApi } from "@/lib/api";
 
 export default function PendingDashboard() {
   const [selectedEngagement, setSelectedEngagement] = useState<Engagement | null>(null);
-  const [engagements, setEngagements] = useState(mockEngagements);
 
-  // Filter engagements where current user is a team member and status is pending
-  const pendingEngagements = engagements.filter(
-    eng => eng.status === "pending" && eng.teamMembers.some(member => member.id === currentUser.id)
-  );
+  const { data: pendingEngagements = [], isLoading, error } = useQuery({
+    queryKey: ["independence", "pending-engagements"],
+    queryFn: async () => {
+      const data = await independenceApi.getMyPendingEngagements();
+      return data.map((eng: any) => ({
+        id: eng.id,
+        engagement_name: eng.engagement_name,
+        entityName: eng.engagement_name || eng.client_name,
+        entityCode: eng.id,
+        client_name: eng.client_name,
+        audit_client_id: eng.audit_client_id,
+        status: "pending" as const,
+        dueDate: "", // no due date from backend for now
+        teamMembers: [],
+        created_at: eng.created_at,
+        updated_at: eng.updated_at
+      } as Engagement));
+    }
+  });
 
-  const handleSubmitDeclaration = (responses: ChecklistResponse[]) => {
+  const handleSubmitDeclaration = async (responses: ChecklistResponse[]) => {
     if (!selectedEngagement) return;
 
-    // Update engagement status
-    setEngagements(prev =>
-      prev.map(eng =>
-        eng.id === selectedEngagement.id
-          ? { ...eng, status: "submitted" as const, submittedDate: new Date().toISOString() }
-          : eng
-      )
-    );
-
-    toast.success("Declaration submitted successfully!");
-    setSelectedEngagement(null);
+    try {
+      await independenceApi.submitFromTool(selectedEngagement.id, responses);
+      toast.success("Declaration submitted successfully!");
+      setSelectedEngagement(null);
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to submit declaration");
+    }
   };
 
   if (selectedEngagement) {
@@ -81,7 +92,24 @@ export default function PendingDashboard() {
           </p>
         </div>
 
-        {pendingEngagements.length === 0 ? (
+        {isLoading ? (
+          <div className="text-center py-16 bg-card rounded-xl border">
+            <Loader2 className="h-12 w-12 text-muted-foreground mx-auto mb-4 animate-spin" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              Loading pending engagements...
+            </h3>
+          </div>
+        ) : error ? (
+          <div className="text-center py-16 bg-card rounded-xl border">
+            <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              Error loading pending engagements
+            </h3>
+            <p className="text-muted-foreground">
+              {error instanceof Error ? error.message : "An error occurred"}
+            </p>
+          </div>
+        ) : pendingEngagements.length === 0 ? (
           <div className="text-center py-16 bg-card rounded-xl border">
             <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-foreground mb-2">

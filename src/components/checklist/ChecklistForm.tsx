@@ -53,9 +53,13 @@ export function ChecklistForm({ engagement, onSubmit, onCancel }: ChecklistFormP
 
   // Replace entity placeholders
   const formatQuestion = (text: string) => {
+    const entityName = engagement.entityName || "";
+    const entityCode = engagement.entityCode || "";
+    const yearStart = engagement.financialYear?.split("-")[0] || "";
+
     return text
-      .replace(/\[Entity Name and Code\]/g, `${engagement.entityName} (${engagement.entityCode})`)
-      .replace(/\[Year\]/g, engagement.financialYear.split('-')[0]);
+      .replace(/\[Entity Name and Code\]/g, `${entityName} (${entityCode})`)
+      .replace(/\[Year\]/g, yearStart);
   };
 
   return (

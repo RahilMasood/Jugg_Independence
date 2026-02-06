@@ -141,3 +141,25 @@ export const engagementApi = {
   },
 };
 
+// Independence API methods (Pending/Submitted tabs)
+export const independenceApi = {
+  getMyPendingEngagements: async () => {
+    const response = await apiClient.get<{ engagements: Array<any> }>(`/independence/my-pending-engagements`);
+    return response.data?.engagements || [];
+  },
+  getMySubmittedEngagements: async () => {
+    const response = await apiClient.get<{ engagements: Array<any> }>(`/independence/my-submitted-engagements`);
+    return response.data?.engagements || [];
+  },
+  getResponsesFile: async (engagementId: string) => {
+    const response = await apiClient.get<{ json: any }>(`/independence/engagements/${engagementId}/responses-file`);
+    return response.data?.json || {};
+  },
+  submitFromTool: async (engagementId: string, responses: any[]) => {
+    const response = await apiClient.post(`/independence/engagements/${engagementId}/submit-from-tool`, {
+      responses
+    });
+    return response.data;
+  }
+};
+
