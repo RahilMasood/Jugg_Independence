@@ -60,7 +60,7 @@ export const checklistQuestions: ChecklistQuestion[] = [
   {
     id: "clo-1",
     category: "Closing Confirmation",
-    question: "I confirm that the above information is correct. If there is any change in any of the above declarations from the date of this confirmation till the 30th of September, [Year] of [Entity Name and Code] and/or its Related Entities and other side entities for such financial year is concluded or end date of 'Closed Window Period', whichever is later, then I will edit my responses in the EDS tool as soon as the change occurs. Also, if I am rendering services to [Entity Name and Code] on continuous basis, then I will ensure compliance with Independence requirements till the AGM date when we cease to be the auditor of [Entity Name and Code] and/or its Related Entities."
+    question: "I confirm that the above information is correct. If there is any change in any of the above declarations from the date of this confirmation till the 30th of September, [Year] of [Entity Name and Code] and/or its Related Entities and other side entities for such financial year is concluded or end date of 'Closed Window Period', whichever is later, then I will edit my responses in the Independence tool as soon as the change occurs. Also, if I am rendering services to [Entity Name and Code] on continuous basis, then I will ensure compliance with Independence requirements till the AGM date when we cease to be the auditor of [Entity Name and Code] and/or its Related Entities."
   },
   {
     id: "clo-2",

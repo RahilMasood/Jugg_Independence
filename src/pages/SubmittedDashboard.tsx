@@ -37,16 +37,31 @@ export default function SubmittedDashboard() {
   });
 
   // When an engagement is selected, fetch its responses JSON from SharePoint via backend
-  const { data: responsesJson, isLoading: isLoadingResponses } = useQuery({
+  const { data: responsesJson, isLoading: isLoadingResponses, error: responsesError } = useQuery({
     queryKey: ["independence", "responses-file", selectedEngagement?.id, user?.id],
     queryFn: async () => {
       if (!selectedEngagement?.id) return null;
-      return await independenceApi.getResponsesFile(selectedEngagement.id);
+      try {
+        const result = await independenceApi.getResponsesFile(selectedEngagement.id);
+        // Log for debugging (remove in production if needed)
+        console.log("Responses file fetched:", {
+          engagementId: selectedEngagement.id,
+          hasData: !!result,
+          isObject: typeof result === "object",
+          keys: result && typeof result === "object" ? Object.keys(result) : [],
+          result
+        });
+        return result;
+      } catch (error) {
+        console.error("Error fetching responses file:", error);
+        throw error;
+      }
     },
     enabled: !!selectedEngagement?.id,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
     staleTime: 0, // Always refetch to get latest responses
+    retry: 1, // Retry once on failure
   });
 
   // Derive the current user's responses from the JSON file
@@ -142,14 +157,40 @@ export default function SubmittedDashboard() {
                 Loading declaration responses...
               </h3>
             </div>
+          ) : responsesError ? (
+            <div className="text-center py-16 bg-card rounded-xl border">
+              <CheckCircle2 className="h-12 w-12 text-destructive mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">
+                Error loading responses
+              </h3>
+              <p className="text-muted-foreground">
+                {responsesError instanceof Error ? responsesError.message : "Failed to load responses from SharePoint"}
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Please try refreshing the page or contact support if the issue persists.
+              </p>
+            </div>
+          ) : !responsesJson || (typeof responsesJson === "object" && Object.keys(responsesJson).length === 0) ? (
+            <div className="text-center py-16 bg-card rounded-xl border">
+              <CheckCircle2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">
+                No responses file found
+              </h3>
+              <p className="text-muted-foreground">
+                This engagement has no saved responses in SharePoint yet.
+              </p>
+            </div>
           ) : !selectedResponses.length ? (
             <div className="text-center py-16 bg-card rounded-xl border">
               <CheckCircle2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-foreground mb-2">
-                No responses found
+                No responses found for your account
               </h3>
               <p className="text-muted-foreground">
-                This engagement has no saved responses in SharePoint yet.
+                The responses file exists but no matching entry was found for your user account.
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                User: {user?.user_name || user?.name || user?.email || "Unknown"}
               </p>
             </div>
           ) : (

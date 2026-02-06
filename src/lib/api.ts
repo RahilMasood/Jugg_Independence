@@ -66,6 +66,14 @@ class ApiClient {
         throw new Error(data.error?.message || 'Request failed');
       }
 
+      // Also check the success field in the response body
+      if (data.success === false) {
+        if (response.status === 401) {
+          this.setToken(null);
+        }
+        throw new Error(data.error?.message || 'Request failed');
+      }
+
       return data;
     } catch (error) {
       if (error instanceof Error) {
@@ -152,8 +160,25 @@ export const independenceApi = {
     return response.data?.engagements || [];
   },
   getResponsesFile: async (engagementId: string) => {
-    const response = await apiClient.get<{ json: any }>(`/independence/engagements/${engagementId}/responses-file`);
-    return response.data?.json || {};
+    try {
+      const response = await apiClient.get<{ json: any }>(`/independence/engagements/${engagementId}/responses-file`);
+      // If response.data exists but json is missing, return empty object
+      // If response.data itself is missing, the API call likely failed and should throw
+      if (!response.data) {
+        throw new Error("Failed to fetch responses file: No data in response");
+      }
+      // Return the json data, or empty object if json is missing (file exists but is empty)
+      const jsonData = response.data.json;
+      // If jsonData is null or undefined, return empty object (file exists but is empty)
+      // If jsonData is an object, return it
+      return jsonData != null ? jsonData : {};
+    } catch (error) {
+      // Re-throw with more context
+      if (error instanceof Error) {
+        throw new Error(`Failed to fetch responses file: ${error.message}`);
+      }
+      throw new Error("Failed to fetch responses file: Unknown error");
+    }
   },
   submitFromTool: async (engagementId: string, responses: any[]) => {
     const response = await apiClient.post(`/independence/engagements/${engagementId}/submit-from-tool`, {
