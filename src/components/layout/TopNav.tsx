@@ -102,9 +102,6 @@ export function TopNav() {
             <p className="text-sm font-medium text-foreground">
               {displayName}
             </p>
-            <p className="text-xs text-muted-foreground capitalize">
-              {currentUser.role}
-            </p>
           </div>
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
             {displayName

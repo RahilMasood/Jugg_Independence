@@ -9,9 +9,10 @@ interface EngagementCardProps {
   engagement: Engagement;
   onClick: () => void;
   showTeamCount?: boolean;
+  showStatus?: boolean;
 }
 
-export function EngagementCard({ engagement, onClick, showTeamCount = false }: EngagementCardProps) {
+export function EngagementCard({ engagement, onClick, showTeamCount = false, showStatus = true }: EngagementCardProps) {
   const entityName = engagement.entityName || engagement.engagement_name || engagement.client_name || engagement.id;
   const entityCode = engagement.entityCode || engagement.id;
   const financialYear = engagement.financialYear || engagement.fy_year || '';
@@ -68,7 +69,7 @@ export function EngagementCard({ engagement, onClick, showTeamCount = false }: E
           </div>
 
           <div className="flex items-center gap-3">
-            <StatusBadge status={status} />
+            {showStatus && <StatusBadge status={status} />}
             <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
           </div>
         </div>

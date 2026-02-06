@@ -343,6 +343,7 @@ export default function EngagementsDashboard() {
                 engagement={engagement}
                 onClick={() => setSelectedEngagement(engagement)}
                 showTeamCount
+                showStatus={false}
               />
             ))}
           </div>
