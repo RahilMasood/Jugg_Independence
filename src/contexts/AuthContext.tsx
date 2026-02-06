@@ -26,22 +26,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Check for stored token on mount
-    const storedToken = localStorage.getItem('accessToken') || localStorage.getItem('auth_token');
-    const storedUser = localStorage.getItem('user');
-    
-    if (storedToken && storedUser) {
-      try {
-        const userData = JSON.parse(storedUser);
-        setToken(storedToken);
-        setUser(userData);
-        apiClient.setToken(storedToken);
-      } catch (e) {
-        // Invalid stored data, clear it
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user');
+    const loadUserFromStorage = () => {
+      const storedToken = localStorage.getItem('accessToken') || localStorage.getItem('auth_token');
+      const storedUser = localStorage.getItem('user');
+      
+      if (storedToken && storedUser) {
+        try {
+          const userData = JSON.parse(storedUser);
+          setToken(storedToken);
+          setUser(userData);
+          apiClient.setToken(storedToken);
+        } catch (e) {
+          // Invalid stored data, clear it
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('user');
+        }
+      } else if (!storedToken || !storedUser) {
+        // If token or user is missing, clear state
+        setToken(null);
+        setUser(null);
+        apiClient.setToken(null);
       }
-    }
+    };
+
+    // Load on mount
+    loadUserFromStorage();
+
+    // Listen for storage changes (e.g., from other tabs or after login)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'accessToken' || e.key === 'auth_token' || e.key === 'user') {
+        loadUserFromStorage();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   const login = (newToken: string, userData: User) => {

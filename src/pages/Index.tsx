@@ -2,9 +2,11 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import LoginForm from "@/components/LoginForm";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
   const navigate = useNavigate();
+  const { login: authLogin, user } = useAuth();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   // If already logged in, send user straight to Pending tab
@@ -14,7 +16,11 @@ const Index = () => {
 
     if (accessToken && storedUser) {
       try {
-        JSON.parse(storedUser);
+        const userData = JSON.parse(storedUser);
+        // If AuthContext doesn't have user yet, update it
+        if (!user && userData) {
+          authLogin(accessToken, userData);
+        }
         setIsLoggedIn(true);
         navigate("/pending");
       } catch {
@@ -23,12 +29,15 @@ const Index = () => {
         localStorage.removeItem("user");
       }
     }
-  }, [navigate]);
+  }, [navigate, user, authLogin]);
 
   const handleUserLogin = async (userData: any, accessToken: string) => {
     setIsLoggedIn(true);
 
-    // Update API client token
+    // Update AuthContext immediately
+    authLogin(accessToken, userData);
+
+    // Update API client token (AuthContext also does this, but doing it here for safety)
     const { apiClient } = await import("@/lib/api");
     apiClient.setToken(accessToken);
 
