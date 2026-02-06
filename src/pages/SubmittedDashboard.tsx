@@ -14,7 +14,7 @@ export default function SubmittedDashboard() {
   const { user } = useAuth();
 
   const { data: submittedEngagements = [], isLoading, error } = useQuery({
-    queryKey: ["independence", "submitted-engagements"],
+    queryKey: ["independence", "submitted-engagements", user?.id],
     queryFn: async () => {
       const data = await independenceApi.getMySubmittedEngagements();
       return data.map((eng: any) => ({
@@ -30,33 +30,82 @@ export default function SubmittedDashboard() {
         created_at: eng.created_at,
         updated_at: eng.updated_at
       } as Engagement));
-    }
+    },
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    staleTime: 0, // Always consider data stale to ensure fresh data on navigation
   });
 
   // When an engagement is selected, fetch its responses JSON from SharePoint via backend
   const { data: responsesJson, isLoading: isLoadingResponses } = useQuery({
-    queryKey: ["independence", "responses-file", selectedEngagement?.id],
+    queryKey: ["independence", "responses-file", selectedEngagement?.id, user?.id],
     queryFn: async () => {
       if (!selectedEngagement?.id) return null;
       return await independenceApi.getResponsesFile(selectedEngagement.id);
     },
-    enabled: !!selectedEngagement?.id
+    enabled: !!selectedEngagement?.id,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    staleTime: 0, // Always refetch to get latest responses
   });
 
   // Derive the current user's responses from the JSON file
   let selectedResponses: ChecklistResponse[] = [];
-  if (selectedEngagement && responsesJson && typeof responsesJson === "object") {
-    const entries = Object.values(responsesJson || {}) as any[];
-    const currentUserId = user?.id;
-    const currentEmail = user?.email;
+  if (selectedEngagement && responsesJson) {
+    // responsesJson should already be the JSON object (extracted from response.data.json in api.ts)
+    // But handle case where it might be wrapped
+    let jsonData: any = responsesJson;
+    if (responsesJson && typeof responsesJson === "object" && "json" in responsesJson && !Array.isArray(responsesJson)) {
+      jsonData = (responsesJson as any).json;
+    }
 
-    let match =
-      entries.find(e => e?.user?.id === currentUserId) ||
-      entries.find(e => e?.user?.email === currentEmail) ||
-      entries[0];
+    if (jsonData && typeof jsonData === "object" && !Array.isArray(jsonData) && jsonData !== null) {
+      // responsesJson is an object with keys like "Rahil M", "Hardik", etc.
+      // Each value is an object with user, engagement_id, responses, etc.
+      const entries = Object.entries(jsonData || {}) as [string, any][];
+      
+      const currentUserId = user?.id ? String(user.id).toLowerCase().trim() : null;
+      const currentEmail = (user?.email || "").toLowerCase().trim();
+      const currentUserName = (user?.user_name || user?.name || "").toLowerCase().trim();
+      const currentType = (user as any)?.type || (user as any)?.user_type || null;
 
-    if (match && Array.isArray(match.responses)) {
-      selectedResponses = match.responses as ChecklistResponse[];
+      // Try to match by ID first (most reliable)
+      let match: [string, any] | undefined = currentUserId
+        ? entries.find(([_, e]) => {
+            const entryId = e?.user?.id ? String(e.user.id).toLowerCase().trim() : null;
+            return entryId && entryId === currentUserId;
+          })
+        : undefined;
+
+      // If no ID match, try email
+      if (!match && currentEmail) {
+        match = entries.find(([_, e]) => {
+          const entryEmail = e?.user?.email ? String(e.user.email).toLowerCase().trim() : "";
+          return entryEmail && entryEmail === currentEmail;
+        });
+      }
+
+      // If no email match, try matching by JSON key (user name) or user.name in entry
+      if (!match && currentUserName) {
+        match = entries.find(([key, e]) => {
+          const keyLower = key.toLowerCase().trim();
+          const entryName = e?.user?.name ? String(e.user.name).toLowerCase().trim() : "";
+          return (keyLower === currentUserName || entryName === currentUserName);
+        });
+      }
+
+      // For external users, if there is exactly one entry with role === 'external', prefer that
+      if (!match && currentType === "external") {
+        const externals = entries.filter(([_, e]) => e?.user?.role === "external");
+        if (externals.length === 1) {
+          match = externals[0];
+        }
+      }
+
+      // Extract the entry data if match found
+      if (match && Array.isArray(match[1]?.responses)) {
+        selectedResponses = match[1].responses as ChecklistResponse[];
+      }
     }
   }
 

@@ -26,8 +26,9 @@ export function ChecklistView({ engagement, responses }: ChecklistViewProps) {
   }, {} as Record<string, 'confirm' | 'reject' | null>);
 
   // Replace entity placeholders
+  // Use client_name for questions (as per requirement), but engagement_name for display elsewhere
   const formatQuestion = (text: string) => {
-    const entityName = engagement.entityName || "";
+    const entityName = engagement.client_name || engagement.entityName || "";
     const entityCode = engagement.entityCode || "";
     const yearStart = engagement.financialYear?.split("-")[0] || "";
 
