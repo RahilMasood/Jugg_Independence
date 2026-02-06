@@ -1,7 +1,8 @@
 import { cn } from "@/lib/utils";
 import { Clock, CheckCircle2, Briefcase, Shield, LogOut } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { currentUser } from "@/data/mockData";
+import { toast } from "sonner";
 
 const navItems = [
   {
@@ -24,7 +25,57 @@ const navItems = [
 
 export function TopNav() {
   const location = useLocation();
+  const navigate = useNavigate();
   const userRole = currentUser.role;
+
+  // Get logged-in user from localStorage (set by login flow)
+  let displayName = currentUser.name;
+  if (typeof window !== "undefined") {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        displayName =
+          parsed.user_name ||
+          parsed.name ||
+          parsed.email ||
+          displayName;
+      } catch {
+        // ignore parse errors and fall back to mock user
+      }
+    }
+  }
+
+  const handleLogout = async () => {
+    const refreshToken = localStorage.getItem("refreshToken");
+    const AUTH_API_URL =
+      import.meta.env.VITE_AUTH_API_URL ||
+      "https://juggernautuserauth-production.up.railway.app/api/v1";
+
+    if (refreshToken) {
+      try {
+        await fetch(`${AUTH_API_URL}/auth/logout`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ refreshToken }),
+        }).catch(() => {});
+      } catch {
+        // ignore
+      }
+    }
+
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("user");
+
+    const { apiClient } = await import("@/lib/api");
+    apiClient.setToken(null);
+
+    toast.success("Logged out successfully");
+    navigate("/");
+  };
 
   const filteredNavItems = navItems.filter(
     item => !item.roles || (item.roles as readonly string[]).includes(userRole)
@@ -47,16 +98,22 @@ export function TopNav() {
         <div className="flex items-center gap-3">
           <div className="text-right">
             <p className="text-sm font-medium text-foreground">
-              {currentUser.name}
+              {displayName}
             </p>
             <p className="text-xs text-muted-foreground capitalize">
               {currentUser.role}
             </p>
           </div>
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-            {currentUser.name.split(' ').map(n => n[0]).join('')}
+            {displayName
+              .split(" ")
+              .map((n) => n[0])
+              .join("")}
           </div>
-          <button className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+          <button
+            onClick={handleLogout}
+            className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
             <LogOut className="h-4 w-4" />
           </button>
         </div>

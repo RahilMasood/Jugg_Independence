@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 
 export default function EngagementsDashboard() {
   const navigate = useNavigate();
-  const { isAuthenticated, logout } = useAuth();
+  const { logout } = useAuth();
   const queryClient = useQueryClient();
   const [selectedEngagement, setSelectedEngagement] = useState<Engagement | null>(null);
   const [showAddUserDialog, setShowAddUserDialog] = useState(false);
@@ -61,7 +61,8 @@ export default function EngagementsDashboard() {
         updated_at: eng.updated_at
       }));
     },
-    enabled: isAuthenticated,
+    // Enable whenever we have an access token; backend will enforce auth
+    enabled: !!localStorage.getItem("accessToken"),
   });
 
   // Fetch selected engagement details
@@ -76,7 +77,7 @@ export default function EngagementsDashboard() {
         teamMembers: data.teamMembers || []
       };
     },
-    enabled: !!selectedEngagement?.id && isAuthenticated,
+    enabled: !!selectedEngagement?.id && !!localStorage.getItem("accessToken"),
   });
 
   // Update selected engagement when details are loaded
