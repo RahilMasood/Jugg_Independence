@@ -1,8 +1,9 @@
 import { cn } from "@/lib/utils";
 import { Clock, CheckCircle2, Briefcase, Shield, LogOut } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { currentUser } from "@/data/mockData";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { useEffect } from "react";
 
 const navItems = [
   {
@@ -26,24 +27,27 @@ const navItems = [
 export function TopNav() {
   const location = useLocation();
   const navigate = useNavigate();
-  const userRole = currentUser.role;
+  const { user, logout: authLogout } = useAuth();
 
-  // Get logged-in user from localStorage (set by login flow)
-  let displayName = currentUser.name;
-  if (typeof window !== "undefined") {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      try {
-        const parsed = JSON.parse(storedUser);
-        displayName =
-          parsed.user_name ||
-          parsed.name ||
-          parsed.email ||
-          displayName;
-      } catch {
-        // ignore parse errors and fall back to mock user
-      }
+  // Redirect to login if no user is logged in
+  useEffect(() => {
+    if (!user && location.pathname !== "/") {
+      navigate("/");
     }
+  }, [user, navigate, location.pathname]);
+
+  // Don't render if no user (except on login page)
+  if (!user && location.pathname !== "/") {
+    return null;
+  }
+
+  // Get display name from authenticated user
+  const displayName = user?.user_name || user?.name || user?.email || "";
+  const userRole = user?.role || user?.type || null;
+
+  // Don't render if no display name (user not logged in)
+  if (!displayName) {
+    return null;
   }
 
   const handleLogout = async () => {
@@ -70,8 +74,8 @@ export function TopNav() {
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
 
-    const { apiClient } = await import("@/lib/api");
-    apiClient.setToken(null);
+    // Clear AuthContext
+    authLogout();
 
     toast.success("Logged out successfully");
     navigate("/");
@@ -105,9 +109,13 @@ export function TopNav() {
           </div>
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
             {displayName
-              .split(" ")
-              .map((n) => n[0])
-              .join("")}
+              ? displayName
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")
+                  .toUpperCase()
+                  .slice(0, 2)
+              : "U"}
           </div>
           <button
             onClick={handleLogout}
@@ -124,7 +132,8 @@ export function TopNav() {
 
 export function SectionNav() {
   const location = useLocation();
-  const userRole = currentUser.role;
+  const { user } = useAuth();
+  const userRole = user?.role || user?.type || null;
 
   const filteredNavItems = navItems.filter(
     item => !item.roles || (item.roles as readonly string[]).includes(userRole)

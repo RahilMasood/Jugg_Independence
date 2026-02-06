@@ -13,10 +13,26 @@ interface ChecklistFormProps {
   engagement: Engagement;
   onSubmit: (responses: ChecklistResponse[]) => void;
   onCancel: () => void;
+  initialResponses?: ChecklistResponse[]; // Optional: pre-populate with existing responses
+  submitButtonText?: string; // Optional: customize submit button text
 }
 
-export function ChecklistForm({ engagement, onSubmit, onCancel }: ChecklistFormProps) {
-  const [responses, setResponses] = useState<Record<string, 'confirm' | 'reject' | null>>({});
+export function ChecklistForm({ engagement, onSubmit, onCancel, initialResponses, submitButtonText = "Submit Declaration" }: ChecklistFormProps) {
+  // Initialize responses from initialResponses if provided
+  const initializeResponses = (): Record<string, 'confirm' | 'reject' | null> => {
+    if (initialResponses && initialResponses.length > 0) {
+      const initial: Record<string, 'confirm' | 'reject' | null> = {};
+      initialResponses.forEach((r) => {
+        if (r.response === 'confirm' || r.response === 'reject') {
+          initial[r.questionId] = r.response;
+        }
+      });
+      return initial;
+    }
+    return {};
+  };
+
+  const [responses, setResponses] = useState<Record<string, 'confirm' | 'reject' | null>>(initializeResponses());
 
   const handleResponseChange = (questionId: string, value: 'confirm' | 'reject') => {
     setResponses(prev => ({ ...prev, [questionId]: value }));
@@ -165,7 +181,7 @@ export function ChecklistForm({ engagement, onSubmit, onCancel }: ChecklistFormP
           className="gap-2"
         >
           <Send className="h-4 w-4" />
-          Submit Declaration
+          {submitButtonText}
         </Button>
       </div>
     </div>

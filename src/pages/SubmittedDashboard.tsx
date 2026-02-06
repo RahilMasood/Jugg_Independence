@@ -1,17 +1,19 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { EngagementCard } from "@/components/engagement/EngagementCard";
-import { ChecklistView } from "@/components/checklist/ChecklistView";
+import { ChecklistForm } from "@/components/checklist/ChecklistForm";
 import { Engagement, ChecklistResponse } from "@/types";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, CheckCircle2, FileText, Loader2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, FileText, Loader2, Edit } from "lucide-react";
 import { independenceApi } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 export default function SubmittedDashboard() {
   const [selectedEngagement, setSelectedEngagement] = useState<Engagement | null>(null);
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const { data: submittedEngagements = [], isLoading, error } = useQuery({
     queryKey: ["independence", "submitted-engagements", user?.id],
@@ -43,14 +45,6 @@ export default function SubmittedDashboard() {
       if (!selectedEngagement?.id) return null;
       try {
         const result = await independenceApi.getResponsesFile(selectedEngagement.id);
-        // Log for debugging (remove in production if needed)
-        console.log("Responses file fetched:", {
-          engagementId: selectedEngagement.id,
-          hasData: !!result,
-          isObject: typeof result === "object",
-          keys: result && typeof result === "object" ? Object.keys(result) : [],
-          result
-        });
         return result;
       } catch (error) {
         console.error("Error fetching responses file:", error);
@@ -85,26 +79,6 @@ export default function SubmittedDashboard() {
       const currentUserName = (user?.user_name || user?.name || (user as any)?.userName || "").toLowerCase().trim();
       const currentType = (user as any)?.type || (user as any)?.user_type || null;
 
-      // Debug logging
-      console.log("Matching user to responses:", {
-        currentUser: {
-          id: currentUserId,
-          email: currentEmail,
-          name: currentUserName,
-          type: currentType,
-          fullUser: user,
-          allUserKeys: user ? Object.keys(user) : []
-        },
-        availableEntries: entries.map(([key, e]) => ({
-          key,
-          userId: e?.user?.id,
-          userEmail: e?.user?.email,
-          userName: e?.user?.name,
-          userRole: e?.user?.role,
-          entryUserKeys: e?.user ? Object.keys(e.user) : []
-        }))
-      });
-
       // Try to match by ID first (most reliable) - check multiple ID field names
       let match: [string, any] | undefined = currentUserId
         ? entries.find(([_, e]) => {
@@ -114,15 +88,12 @@ export default function SubmittedDashboard() {
           })
         : undefined;
 
-      console.log("Match by ID:", match ? { key: match[0], userId: match[1]?.user?.id } : "No match");
-
       // If no ID match, try email
       if (!match && currentEmail) {
         match = entries.find(([_, e]) => {
           const entryEmail = e?.user?.email ? String(e.user.email).toLowerCase().trim() : "";
           return entryEmail && entryEmail === currentEmail;
         });
-        console.log("Match by email:", match ? { key: match[0], email: match[1]?.user?.email } : "No match");
       }
 
       // If no email match, try matching by JSON key (user name) or user.name in entry
@@ -132,7 +103,6 @@ export default function SubmittedDashboard() {
           const entryName = e?.user?.name ? String(e.user.name).toLowerCase().trim() : "";
           return (keyLower === currentUserName || entryName === currentUserName);
         });
-        console.log("Match by name:", match ? { key: match[0], name: match[1]?.user?.name } : "No match");
       }
 
       // For external users, if there is exactly one entry with role === 'external', prefer that
@@ -141,7 +111,6 @@ export default function SubmittedDashboard() {
         if (externals.length === 1) {
           match = externals[0];
         }
-        console.log("Match by external role:", match ? { key: match[0] } : `No match (found ${externals.length} external entries)`);
       }
 
       // Final fallback: Try to match JSON key directly (case-insensitive, trimmed)
@@ -152,13 +121,11 @@ export default function SubmittedDashboard() {
           // Try matching key against user name variations
           if (currentUserName && keyLower === currentUserName) {
             match = [key, entry];
-            console.log("Match by JSON key (exact):", { key, matchedName: currentUserName });
             break;
           }
           // Try partial match (key contains name or name contains key)
           if (currentUserName && (keyLower.includes(currentUserName) || currentUserName.includes(keyLower))) {
             match = [key, entry];
-            console.log("Match by JSON key (partial):", { key, matchedName: currentUserName });
             break;
           }
         }
@@ -167,18 +134,29 @@ export default function SubmittedDashboard() {
       // Extract the entry data if match found
       if (match && Array.isArray(match[1]?.responses)) {
         selectedResponses = match[1].responses as ChecklistResponse[];
-        console.log("Selected responses found:", selectedResponses.length, "responses");
-      } else {
-        console.log("No match found or no responses array in match", {
-          hasMatch: !!match,
-          hasResponses: match ? Array.isArray(match[1]?.responses) : false,
-          matchData: match ? { key: match[0], hasUser: !!match[1]?.user, hasResponses: !!match[1]?.responses } : null
-        });
       }
     }
   }
 
-  // Detail view: show uneditable checklist with loaded responses
+  // Handle saving updated responses
+  const handleSaveChanges = async (responses: ChecklistResponse[]) => {
+    if (!selectedEngagement) return;
+
+    try {
+      // Use the same submit endpoint - it should update existing entries
+      await independenceApi.submitFromTool(selectedEngagement.id, responses);
+      
+      // Invalidate queries to refetch updated data
+      queryClient.invalidateQueries({ queryKey: ["independence", "responses-file", selectedEngagement.id] });
+      queryClient.invalidateQueries({ queryKey: ["independence", "submitted-engagements", user?.id] });
+      
+      toast.success("Declaration updated successfully!");
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to update declaration");
+    }
+  };
+
+  // Detail view: show editable checklist with loaded responses
   if (selectedEngagement) {
     return (
       <MainLayout>
@@ -194,9 +172,9 @@ export default function SubmittedDashboard() {
 
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-2">
-              <FileText className="h-6 w-6 text-success" />
+              <Edit className="h-6 w-6 text-success" />
               <h1 className="text-2xl font-bold text-foreground">
-                Declaration Details
+                Edit Declaration
               </h1>
             </div>
             <p className="text-muted-foreground">
@@ -248,9 +226,12 @@ export default function SubmittedDashboard() {
               </p>
             </div>
           ) : (
-            <ChecklistView
+            <ChecklistForm
               engagement={selectedEngagement}
-              responses={selectedResponses}
+              onSubmit={handleSaveChanges}
+              onCancel={() => setSelectedEngagement(null)}
+              initialResponses={selectedResponses}
+              submitButtonText="Save Changes"
             />
           )}
         </div>
@@ -314,3 +295,4 @@ export default function SubmittedDashboard() {
     </MainLayout>
   );
 }
+

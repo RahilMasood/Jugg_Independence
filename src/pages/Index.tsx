@@ -9,27 +9,18 @@ const Index = () => {
   const { login: authLogin, user } = useAuth();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // If already logged in, send user straight to Pending tab
+  // Don't restore login state from localStorage on mount
+  // Reloads should log users out - only check if user is already logged in via AuthContext
+  // (which happens when login() is called during the current session)
   useEffect(() => {
-    const accessToken = localStorage.getItem("accessToken");
-    const storedUser = localStorage.getItem("user");
-
-    if (accessToken && storedUser) {
-      try {
-        const userData = JSON.parse(storedUser);
-        // If AuthContext doesn't have user yet, update it
-        if (!user && userData) {
-          authLogin(accessToken, userData);
-        }
-        setIsLoggedIn(true);
-        navigate("/pending");
-      } catch {
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        localStorage.removeItem("user");
-      }
+    // Only navigate if user is already logged in via AuthContext (from current session)
+    if (user) {
+      setIsLoggedIn(true);
+      navigate("/pending");
+    } else {
+      setIsLoggedIn(false);
     }
-  }, [navigate, user, authLogin]);
+  }, [navigate, user]);
 
   const handleUserLogin = async (userData: any, accessToken: string) => {
     setIsLoggedIn(true);

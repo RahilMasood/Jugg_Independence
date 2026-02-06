@@ -25,38 +25,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for stored token on mount
-    const loadUserFromStorage = () => {
-      const storedToken = localStorage.getItem('accessToken') || localStorage.getItem('auth_token');
-      const storedUser = localStorage.getItem('user');
-      
-      if (storedToken && storedUser) {
-        try {
-          const userData = JSON.parse(storedUser);
-          setToken(storedToken);
-          setUser(userData);
-          apiClient.setToken(storedToken);
-        } catch (e) {
-          // Invalid stored data, clear it
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('user');
+    // Don't load from localStorage on mount - reloads should log users out
+    // Only load from localStorage if it was set during the current session (via login)
+    // This is handled by the login() function being called after successful login
+    
+    // Listen for storage changes (e.g., from other tabs)
+    // But only update if the storage event is from another tab (not from our own clear)
+    const handleStorageChange = (e: StorageEvent) => {
+      // Only handle storage events from other tabs/windows
+      // If newValue is null, it means it was cleared (likely by us), so ignore
+      if (e.newValue && (e.key === 'accessToken' || e.key === 'auth_token' || e.key === 'user')) {
+        if (e.key === 'accessToken' || e.key === 'auth_token') {
+          const storedUser = localStorage.getItem('user');
+          if (storedUser) {
+            try {
+              const userData = JSON.parse(storedUser);
+              setToken(e.newValue);
+              setUser(userData);
+              apiClient.setToken(e.newValue);
+            } catch (e) {
+              // Invalid data
+              setToken(null);
+              setUser(null);
+              apiClient.setToken(null);
+            }
+          }
+        } else if (e.key === 'user') {
+          const storedToken = localStorage.getItem('accessToken') || localStorage.getItem('auth_token');
+          if (storedToken) {
+            try {
+              const userData = JSON.parse(e.newValue);
+              setToken(storedToken);
+              setUser(userData);
+              apiClient.setToken(storedToken);
+            } catch (e) {
+              // Invalid data
+              setToken(null);
+              setUser(null);
+              apiClient.setToken(null);
+            }
+          }
         }
-      } else if (!storedToken || !storedUser) {
-        // If token or user is missing, clear state
+      } else if (e.newValue === null && (e.key === 'accessToken' || e.key === 'auth_token' || e.key === 'user')) {
+        // Storage was cleared - log out
         setToken(null);
         setUser(null);
         apiClient.setToken(null);
-      }
-    };
-
-    // Load on mount
-    loadUserFromStorage();
-
-    // Listen for storage changes (e.g., from other tabs or after login)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'accessToken' || e.key === 'auth_token' || e.key === 'user') {
-        loadUserFromStorage();
       }
     };
 
