@@ -114,6 +114,12 @@ export const engagementApi = {
     return response.data;
   },
 
+  // Get engagement by ID for independence tool (team members filtered by independence_tool=true)
+  getEngagementForIndependenceTool: async (id: string) => {
+    const response = await apiClient.get<any>(`/engagements/${id}/for-independence-tool`);
+    return response.data;
+  },
+
   // Get users with main access for an engagement
   getUsersWithMainAccess: async (engagementId: string) => {
     const response = await apiClient.get<{ users: Array<any> }>(`/engagements/${engagementId}/users/main-access`);
@@ -123,6 +129,14 @@ export const engagementApi = {
   // Add user to independence tool
   addUserToIndependenceTool: async (engagementId: string, userId: string) => {
     const response = await apiClient.post(`/engagements/${engagementId}/users/${userId}/independence-tool`);
+    return response.data;
+  },
+
+  // Add multiple users to independence tool (batch)
+  addUsersToIndependenceTool: async (engagementId: string, userIds: string[]) => {
+    const response = await apiClient.post(`/engagements/${engagementId}/users/independence-tool`, {
+      user_ids: userIds
+    });
     return response.data;
   },
 };

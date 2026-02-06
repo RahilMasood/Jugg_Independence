@@ -66,15 +66,14 @@ export default function EngagementsDashboard() {
 
   // Fetch selected engagement details
   const { data: engagementDetails } = useQuery({
-    queryKey: ['engagement', selectedEngagement?.id],
+    queryKey: ['engagement', selectedEngagement?.id, 'independence-tool'],
     queryFn: async () => {
       if (!selectedEngagement?.id) return null;
-      const data = await engagementApi.getEngagement(selectedEngagement.id);
-      // Filter to show only users with independence_tool=true
-      const independenceUsers = (data.teamMembers || []).filter((m: User) => m.independence_tool === true);
+      // Use the independence tool specific endpoint that filters team members by independence_tool=true
+      const data = await engagementApi.getEngagementForIndependenceTool(selectedEngagement.id);
       return {
         ...selectedEngagement,
-        teamMembers: independenceUsers
+        teamMembers: data.teamMembers || []
       };
     },
     enabled: !!selectedEngagement?.id && isAuthenticated,
@@ -87,31 +86,31 @@ export default function EngagementsDashboard() {
     }
   }, [engagementDetails]);
 
-  // Add users to independence tool mutation
-  const addUserMutation = useMutation({
-    mutationFn: async ({ engagementId, userId }: { engagementId: string; userId: string }) => {
-      return await engagementApi.addUserToIndependenceTool(engagementId, userId);
+  // Add users to independence tool mutation (batch)
+  const addUsersMutation = useMutation({
+    mutationFn: async ({ engagementId, userIds }: { engagementId: string; userIds: string[] }) => {
+      return await engagementApi.addUsersToIndependenceTool(engagementId, userIds);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['engagement', selectedEngagement?.id] });
       queryClient.invalidateQueries({ queryKey: ['engagements', 'independence-tool'] });
-      toast.success('User added to independence tool successfully!');
+      const count = data?.updated_count || 0;
+      toast.success(`${count} user(s) added to independence tool successfully!`);
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to add user');
+      toast.error(error.message || 'Failed to add users');
     }
   });
 
   const handleAddUsers = async (users: User[]) => {
     if (!selectedEngagement) return;
 
-    // Add each user to independence tool
-    for (const user of users) {
-      await addUserMutation.mutateAsync({
-        engagementId: selectedEngagement.id,
-        userId: user.id
-      });
-    }
+    // Add all selected users to independence tool in one batch request
+    const userIds = users.map(user => user.id);
+    await addUsersMutation.mutateAsync({
+      engagementId: selectedEngagement.id,
+      userIds: userIds
+    });
 
     // Refresh engagement details
     queryClient.invalidateQueries({ queryKey: ['engagement', selectedEngagement.id] });
