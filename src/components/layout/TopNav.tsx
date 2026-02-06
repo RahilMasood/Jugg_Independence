@@ -86,12 +86,14 @@ export function TopNav() {
       <div className="flex h-16 items-center justify-between px-6">
         {/* Logo */}
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <Shield className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-sm font-semibold text-foreground">Independence Declaration System</h1>
-          </div>
+          <img
+            src="/logo_name.png"
+            alt="Verity AI"
+            className="h-8 object-contain"
+          />
+          <h1 className="text-base sm:text-lg font-bold tracking-tight text-foreground">
+            Independence Tool
+          </h1>
         </div>
 
         {/* User Profile */}
@@ -112,9 +114,10 @@ export function TopNav() {
           </div>
           <button
             onClick={handleLogout}
-            className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            className="flex items-center gap-2 rounded-lg px-3 py-2 text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/20 dark:hover:text-red-300 transition-colors font-medium"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-5 w-5" />
+            <span className="text-sm">Logout</span>
           </button>
         </div>
       </div>

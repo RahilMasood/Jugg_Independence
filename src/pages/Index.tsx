@@ -71,8 +71,15 @@ const Index = () => {
       <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
+            <div className="flex justify-center mb-4">
+              <img
+                src="/logo_name.png"
+                alt="Verity AI"
+                className="h-12 object-contain"
+              />
+            </div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Independence Tool</h1>
-            <p className="text-muted-foreground">Professional Audit Independence Platform</p>
+            <p className="text-muted-foreground">Professional Audit Independence Platform by Verity AI</p>
           </div>
           <LoginForm onLoginSuccess={handleUserLogin} />
         </div>
