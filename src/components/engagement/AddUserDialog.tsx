@@ -72,7 +72,7 @@ export function AddUserDialog({ open, onOpenChange, engagementId, existingUserId
   // Load / create external user similar to Confirmation Tool's client user flow
   const AUTH_API_URL =
     import.meta.env.VITE_AUTH_API_URL ||
-    "https://juggernautuserauth-production.up.railway.app/api/v1";
+    "https://userauth.verityaudit.in/api/v1";
 
   const handleSearchExternal = async () => {
     if (!externalEmail) {

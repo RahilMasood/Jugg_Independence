@@ -54,7 +54,7 @@ export function TopNav() {
     const refreshToken = localStorage.getItem("refreshToken");
     const AUTH_API_URL =
       import.meta.env.VITE_AUTH_API_URL ||
-      "https://juggernautuserauth-production.up.railway.app/api/v1";
+      "https://userauth.verityaudit.in/api/v1";
 
     if (refreshToken) {
       try {

@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_AUTH_API_URL || import.meta.env.VITE_API_BASE_URL || 'https://juggernautuserauth-production.up.railway.app/api/v1';
+const API_BASE_URL = import.meta.env.VITE_AUTH_API_URL || import.meta.env.VITE_API_BASE_URL || 'https://userauth.verityaudit.in/api/v1';
 
 export interface ApiResponse<T> {
   success: boolean;
